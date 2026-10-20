@@ -9,3 +9,7 @@
 - Added a local SQLite snapshot store and history command for descriptive deltas, hourly rates, and three-observation rate-change estimates.
 - Added offline tests for market parsing, scoring, API responses, and historical calculations.
 - Added a GitHub Actions test workflow.
+
+- Added a local ranking command for previously observed pools with liquidity, freshness, and observation-count gates.
+- Ranking reports exclusions and clearly states that it is not market-wide discovery or a predictive signal.
+- Added tests for ranking behavior and bounded recent snapshot retrieval.
