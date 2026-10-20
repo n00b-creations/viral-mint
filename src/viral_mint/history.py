@@ -107,6 +107,26 @@ class SnapshotStore:
         self.connection.commit()
         return int(cursor.lastrowid)
 
+    def recent_snapshots(self, limit: int = 10000) -> list[Snapshot]:
+        """Return a bounded set of recent observations for local ranking."""
+        if limit < 1 or limit > 100000:
+            raise ValueError("limit must be between 1 and 100000")
+        rows = self.connection.execute(
+            "SELECT * FROM snapshots ORDER BY observed_at DESC, id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [
+            Snapshot(
+                observed_at=row["observed_at"], chain_id=row["chain_id"],
+                token_address=row["token_address"], pair_address=row["pair_address"],
+                symbol=row["symbol"], price_usd=row["price_usd"],
+                liquidity_usd=row["liquidity_usd"], volume_h1_usd=row["volume_h1_usd"],
+                buys_h1=row["buys_h1"], sells_h1=row["sells_h1"],
+                market_activity_score=row["market_activity_score"],
+                warnings=tuple(json.loads(row["warnings_json"])),
+            )
+            for row in rows
+        ]
+
     def history(self, chain_id: str, token_address: str, pair_address: str, limit: int = 20) -> list[Snapshot]:
         if limit < 1 or limit > 1000:
             raise ValueError("limit must be between 1 and 1000")
