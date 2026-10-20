@@ -13,3 +13,8 @@
 - Added a local ranking command for previously observed pools with liquidity, freshness, and observation-count gates.
 - Ranking reports exclusions and clearly states that it is not market-wide discovery or a predictive signal.
 - Added tests for ranking behavior and bounded recent snapshot retrieval.
+
+- Added bounded retries for transient HTTP and transport failures, including capped Retry-After handling.
+- Added continuous local watchlist collection with per-token failure reporting and cycle summaries.
+- Added CSV export for stored observations with missing-field and warning counts.
+- Added offline tests for retries and CSV export.
