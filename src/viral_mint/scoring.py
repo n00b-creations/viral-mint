@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from viral_mint.models import MarketPair
@@ -32,7 +33,7 @@ def score_pair(pair: MarketPair) -> ScoreResult:
     # Liquidity: $50k reaches the component ceiling. This is a configurable
     # heuristic threshold, not a universal definition of adequate liquidity.
     if pair.liquidity_usd is not None and pair.liquidity_usd >= 0:
-        value = _clamp(__import__("math").log1p(pair.liquidity_usd) / __import__("math").log1p(50_000))
+        value = _clamp(math.log1p(pair.liquidity_usd) / math.log1p(50_000))
         components["liquidity"] = round(value * 100, 2)
         weighted.append((value, 0.30))
     else:
@@ -40,7 +41,7 @@ def score_pair(pair: MarketPair) -> ScoreResult:
 
     # One-hour volume reaches the ceiling at $25k.
     if pair.volume_h1_usd is not None and pair.volume_h1_usd >= 0:
-        value = _clamp(__import__("math").log1p(pair.volume_h1_usd) / __import__("math").log1p(25_000))
+        value = _clamp(math.log1p(pair.volume_h1_usd) / math.log1p(25_000))
         components["volume_h1"] = round(value * 100, 2)
         weighted.append((value, 0.25))
     else:
@@ -49,7 +50,7 @@ def score_pair(pair: MarketPair) -> ScoreResult:
     # Transaction count measures activity, not unique traders or organic demand.
     if pair.buys_h1 is not None and pair.sells_h1 is not None:
         tx_count = pair.buys_h1 + pair.sells_h1
-        value = _clamp(__import__("math").log1p(tx_count) / __import__("math").log1p(200))
+        value = _clamp(math.log1p(tx_count) / math.log1p(200))
         components["transactions_h1"] = round(value * 100, 2)
         weighted.append((value, 0.25))
     else:
