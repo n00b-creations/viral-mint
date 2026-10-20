@@ -18,6 +18,9 @@ ViralMint is a standalone cryptocurrency market-attention research project. It c
 - Estimate a change in hourly rate (“acceleration”) for volume and score when at least three valid observations are available.
 - Rank previously observed pools using configurable liquidity, freshness, and minimum-history gates, with explicit exclusion reasons.
 - Emit JSON with score components, data-quality warnings, and history.
+- Retry transient API errors with bounded exponential backoff and optional `Retry-After` handling.
+- Repeatedly collect a public-token watchlist into local SQLite with per-token failure logs.
+- Export observations to CSV with missing-field and warning counts.
 - Run offline tests with mocked HTTP responses.
 
 ## Quick start
@@ -73,6 +76,36 @@ viral-mint rank --db /path/to/other.sqlite3
 
 The command considers only pools already stored in the selected local database. Run `snapshot` for multiple token addresses into the same database over several intervals to compare them. Defaults require at least $10,000 latest reported liquidity, observations no older than six hours, and at least three observations per pool. Excluded pools are reported with reasons. Ordering is transparent: latest activity score, then score change, then change in the rolling one-hour volume field. This is **not market-wide token discovery**.
 
+### 5. Continuous watchlist collection
+
+Copy `config/watchlist.example.json` to `config/watchlist.json` and replace the placeholder with public token addresses you want to track:
+
+```json
+[
+  { "chain": "solana", "token_address": "YOUR_PUBLIC_TOKEN_ADDRESS" },
+  { "chain": "ethereum", "token_address": "YOUR_OTHER_PUBLIC_TOKEN_ADDRESS" }
+]
+```
+
+Start the collector:
+
+```bash
+viral-mint collect --watchlist config/watchlist.json --interval-seconds 900
+```
+
+The collector writes each successful observation to the same local SQLite database, reports per-token failures to stderr, and continues to the next token. The interval must be at least 30 seconds; the default is 900 seconds (15 minutes). Stop continuous mode with Ctrl+C. To run a finite number of cycles, add `--cycles 3`. Use `--db /path/to/history.sqlite3` to choose a persistent path.
+
+The client retries transient HTTP statuses (including 429 and common 5xx responses) and transport failures a bounded number of times. Non-transient HTTP errors are not retried. This is a local collector process, not a hosted schedule: if the process or device stops, collection stops. A hosted scheduled runner needs a deliberate persistent database or external storage arrangement; ephemeral runner files do not preserve history between runs.
+
+### 6. Export observations to CSV
+
+```bash
+viral-mint export-csv
+viral-mint export-csv --db data/viral_mint.sqlite3 --output exports/snapshots.csv --limit 50000
+```
+
+The command writes one row per stored observation and prints a JSON summary with export count, rows carrying warnings, and missing price, liquidity, and one-hour-volume counts. The export limit is 1–100000 observations.
+
 ## Library example
 
 ```python
@@ -101,7 +134,7 @@ Historical comparisons are descriptive. Dexscreener's rolling-window volume and 
 ## Data handling and limitations
 
 - Uses public market-pair data from Dexscreener; API fields, rate limits, and availability can change.
-- Network calls have a timeout and raise explicit errors for HTTP or malformed responses.
+- Network calls have a timeout and bounded retries for transient HTTP and transport failures; rate limits can still prevent collection.
 - No fabricated social signals, news mentions, holder counts, or sentiment metrics are generated.
 - No token-risk, honeypot, contract exploit, wash-trading, insider concentration, or liquidity-lock screening is implemented.
 - The ranking command evaluates tracked pools only; it does not enumerate every token or identify social virality.
@@ -124,10 +157,11 @@ See [CHANGELOG.md](CHANGELOG.md) and [SECURITY.md](SECURITY.md).
 
 1. **Implemented foundation:** market client, explainable score, CLI, SQLite snapshots, historical deltas, offline tests, and CI.
 2. **Implemented tracked-pool ranking:** freshness, liquidity, minimum-history gates, exclusion reasons, and JSON output.
-3. Add rate-limit-aware retry/backoff, robust caching, scheduled collection, and CSV export.
-4. Add explicit observation schedules and snapshot freshness/data-quality reporting.
-5. Add optional, source-attributed social/news adapters with provenance, freshness, and coverage metadata.
-6. Backtest and calibrate signals against historical outcomes, accounting for survivorship bias and data-quality limitations.
-7. Build a dashboard after the data and scoring pipeline is reproducible.
+3. **Implemented collection reliability:** bounded transient-error retries and watchlist-based continuous local collection.
+4. **Implemented export:** CSV snapshots with data-quality summary counts.
+5. Add caching, alerting, and optional hosted scheduling with a verified persistent storage strategy.
+6. Add optional, source-attributed social/news adapters with provenance, freshness, and coverage metadata.
+7. Backtest and calibrate signals against historical outcomes, accounting for survivorship bias and data-quality limitations.
+8. Build a dashboard after the data and scoring pipeline is reproducible.
 
 Roadmap items beyond the implemented code are planned, not implemented.
