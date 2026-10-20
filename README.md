@@ -6,7 +6,7 @@ ViralMint is a standalone cryptocurrency market-attention research project. It c
 
 ## Project status
 
-**Research MVP foundation.** The repository includes a Python library, CLI, Dexscreener public market-data client, explainable market-activity scoring, local SQLite snapshots, historical delta/rate calculations, tests, and a GitHub Actions test workflow. It is not yet a production monitoring service and does not measure social attention.
+**Research MVP foundation.** The repository includes a Python library, CLI, Dexscreener public market-data client, explainable market-activity scoring, local SQLite snapshots, historical delta/rate calculations, a local ranking command for tracked pools, tests, and a GitHub Actions test workflow. It is not yet a production monitoring service and does not measure social attention.
 
 ## Capabilities
 
@@ -16,6 +16,7 @@ ViralMint is a standalone cryptocurrency market-attention research project. It c
 - Save timestamped observations to a local SQLite database.
 - Compare recent observations and calculate descriptive hourly changes.
 - Estimate a change in hourly rate (“acceleration”) for volume and score when at least three valid observations are available.
+- Rank previously observed pools using configurable liquidity, freshness, and minimum-history gates, with explicit exclusion reasons.
 - Emit JSON with score components, data-quality warnings, and history.
 - Run offline tests with mocked HTTP responses.
 
@@ -62,6 +63,16 @@ The command returns stored observations, the latest pairwise changes, elapsed ti
 
 Use `--limit 50` to load up to 50 recent observations. Supported range is 1–1000.
 
+### 4. Rank tracked pools
+
+```bash
+viral-mint rank
+viral-mint rank --min-liquidity 25000 --max-age-hours 3 --min-observations 4 --limit 10
+viral-mint rank --db /path/to/other.sqlite3
+```
+
+The command considers only pools already stored in the selected local database. Run `snapshot` for multiple token addresses into the same database over several intervals to compare them. Defaults require at least $10,000 latest reported liquidity, observations no older than six hours, and at least three observations per pool. Excluded pools are reported with reasons. Ordering is transparent: latest activity score, then score change, then change in the rolling one-hour volume field. This is **not market-wide token discovery**.
+
 ## Library example
 
 ```python
@@ -93,6 +104,7 @@ Historical comparisons are descriptive. Dexscreener's rolling-window volume and 
 - Network calls have a timeout and raise explicit errors for HTTP or malformed responses.
 - No fabricated social signals, news mentions, holder counts, or sentiment metrics are generated.
 - No token-risk, honeypot, contract exploit, wash-trading, insider concentration, or liquidity-lock screening is implemented.
+- The ranking command evaluates tracked pools only; it does not enumerate every token or identify social virality.
 - No automated trading, wallet connection, or order execution is included.
 - Do not put private keys, exchange credentials, or wallet seed phrases in this project.
 - Local SQLite history is not synced or backed up automatically.
@@ -110,11 +122,12 @@ See [CHANGELOG.md](CHANGELOG.md) and [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
-1. **Foundation:** market client, explainable score, CLI, SQLite snapshots, historical deltas, offline tests, and CI.
-2. Add rate-limit-aware retry/backoff, robust caching, and CSV export.
-3. Add explicit observation schedules and snapshot freshness/data-quality reporting.
-4. Add optional, source-attributed social/news adapters with provenance, freshness, and coverage metadata.
-5. Backtest and calibrate signals against historical outcomes, accounting for survivorship bias and data-quality limitations.
-6. Build a dashboard after the data and scoring pipeline is reproducible.
+1. **Implemented foundation:** market client, explainable score, CLI, SQLite snapshots, historical deltas, offline tests, and CI.
+2. **Implemented tracked-pool ranking:** freshness, liquidity, minimum-history gates, exclusion reasons, and JSON output.
+3. Add rate-limit-aware retry/backoff, robust caching, scheduled collection, and CSV export.
+4. Add explicit observation schedules and snapshot freshness/data-quality reporting.
+5. Add optional, source-attributed social/news adapters with provenance, freshness, and coverage metadata.
+6. Backtest and calibrate signals against historical outcomes, accounting for survivorship bias and data-quality limitations.
+7. Build a dashboard after the data and scoring pipeline is reproducible.
 
 Roadmap items beyond the implemented code are planned, not implemented.
