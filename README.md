@@ -6,20 +6,16 @@ ViralMint is a standalone cryptocurrency market-attention research project. It c
 
 ## Project status
 
-**Initial scaffold.** The first milestone provides a small Python library for retrieving Dexscreener pair data and calculating explainable attention scores. It is not yet a production monitoring service and does not claim to measure social attention unless a configured, real source supplies that data.
+**Initial research MVP scaffold.** The repository now contains a Python library, a command-line token query, an explainable market-activity score, offline tests, and a GitHub Actions test workflow. This is not yet a production monitoring service and does not measure social attention.
 
 ## Initial capabilities
 
 - Fetch public token-pair data from the Dexscreener API.
-- Normalize market fields and handle missing values conservatively.
-- Calculate a transparent 0–100 **market-activity score** from liquidity, transaction activity, volume, and short-window price movement.
-- Return score components and data-quality warnings so a score can be inspected rather than treated as a black box.
-- Test scoring behavior without network access.
-- Keep API credentials out of source code; the initial Dexscreener endpoints used here are public.
-
-## What the score means
-
-The initial score is a heuristic measure of **observable market activity**, not virality. Market data alone cannot verify social momentum, news catalysts, token legitimacy, or future returns. Missing fields are not silently interpreted as evidence of strength. Scores should be compared only when the underlying data and observation windows are reasonably comparable.
+- Normalize market fields and handle missing or malformed values conservatively.
+- Calculate a transparent 0–100 **market-activity score** from liquidity, one-hour transaction activity, one-hour volume, and short-window price movement.
+- Return score components and data-quality warnings.
+- Run offline unit tests with mocked HTTP responses.
+- Export a token's pair summary as JSON to standard output.
 
 ## Quick start
 
@@ -36,13 +32,13 @@ python -m pip install -e ".[dev]"
 pytest
 ```
 
-Run a simple query:
+Query a token address on a supported Dexscreener chain:
 
 ```bash
 viral-mint token <TOKEN_ADDRESS> --chain solana
 ```
 
-The CLI will be added in a subsequent milestone; until then, use the library directly or wait for the CLI implementation.
+The CLI prints JSON containing pair metadata, observed market fields, score components, and warnings. Use a real address and the appropriate chain identifier.
 
 ## Library example
 
@@ -61,33 +57,41 @@ async def main():
 asyncio.run(main())
 ```
 
-Use a real token address for the chain you specify. A token can have multiple pools; evaluate pool liquidity and pair age before drawing conclusions.
+A token can have multiple pools. Evaluate pool liquidity, pool age, and data quality before drawing conclusions.
+
+## What the score means
+
+The score is a heuristic measure of **observable market activity**, not virality. Market data alone cannot verify social momentum, news catalysts, token legitimacy, or future returns. The current score measures the magnitude of one-hour price movement, not whether that movement is positive; a sharp drop can therefore contribute to the movement component. It is not a token-safety score.
+
+Weights and saturation thresholds are initial heuristics, not empirically calibrated predictors. Missing components are omitted and remaining weights are renormalized; the output includes warnings when coverage is partial. Compare scores only when the underlying data and observation windows are reasonably comparable.
 
 ## Data handling and limitations
 
 - Uses public market-pair data from Dexscreener; API fields, limits, and availability can change.
-- Network calls have timeouts and raise explicit errors for HTTP or malformed responses.
+- Network calls have a timeout and raise explicit errors for HTTP or malformed responses.
 - No fabricated social signals, news mentions, holder counts, or sentiment metrics are generated.
-- This initial version does not screen for honeypots, contract exploits, wash trading, insider concentration, or liquidity locks.
+- This version does not screen for honeypots, contract exploits, wash trading, insider concentration, or liquidity locks.
 - No automated trading, wallet connection, or order execution is included.
 - Do not put private keys, exchange credentials, or wallet seed phrases in this project.
 
-## Development
+## Development and CI
 
 ```bash
 python -m pip install -e ".[dev]"
 pytest
 ```
 
-See [CHANGELOG.md](CHANGELOG.md) for milestone history. See [SECURITY.md](SECURITY.md) for responsible reporting.
+GitHub Actions is configured to run the test suite on pushes to `main`, pull requests, and manual dispatch. A workflow configuration is not proof that a run has passed; check the repository's Actions tab for actual run results.
+
+See [CHANGELOG.md](CHANGELOG.md) for milestone history and [SECURITY.md](SECURITY.md) for responsible reporting.
 
 ## Roadmap
 
-1. **Foundation:** validated models, Dexscreener client, explainable market-activity score, offline tests.
-2. CLI and JSON/CSV exports; retries, rate-limit handling, and caching.
-3. Historical snapshots and time-series deltas to distinguish acceleration from absolute activity.
-4. Optional, source-attributed social/news adapters with provenance and freshness metadata.
-5. Backtesting and score calibration against historical outcomes, with survivorship-bias and data-quality checks.
-6. Dashboard only after the data and scoring pipeline are testable and reproducible.
+1. **Foundation (in progress):** validated models, Dexscreener client, explainable market-activity score, CLI, offline tests, and CI.
+2. Add retries, rate-limit-aware backoff, caching, and JSON/CSV export options.
+3. Store historical snapshots and calculate time-series acceleration rather than relying only on a single snapshot.
+4. Add optional, source-attributed social/news adapters with provenance and freshness metadata.
+5. Backtest and calibrate scores against historical outcomes, accounting for survivorship bias and data-quality limitations.
+6. Add a dashboard after the data and scoring pipeline is reproducible.
 
-All roadmap items beyond the current scaffold are planned, not implemented.
+Roadmap items beyond the current code are planned, not implemented.
