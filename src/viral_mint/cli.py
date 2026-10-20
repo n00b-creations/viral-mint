@@ -11,6 +11,7 @@ from dataclasses import asdict
 from viral_mint.dexscreener import DexscreenerClient, DexscreenerError
 from viral_mint.history import Snapshot, SnapshotStore, analyze_trend
 from viral_mint.scoring import score_pair
+from viral_mint.ranking import rank_observed_pools
 
 
 async def _fetch_pairs(chain: str, address: str):
@@ -110,14 +111,32 @@ def main() -> None:
     history_parser.add_argument("--db", default="data/viral_mint.sqlite3")
     history_parser.add_argument("--limit", type=int, default=20, help="Number of recent observations to load (1–1000).")
 
+    rank_parser = subparsers.add_parser("rank", help="Rank pools already observed in the local database.")
+    rank_parser.add_argument("--db", default="data/viral_mint.sqlite3")
+    rank_parser.add_argument("--min-liquidity", type=float, default=10000.0)
+    rank_parser.add_argument("--max-age-hours", type=float, default=6.0)
+    rank_parser.add_argument("--min-observations", type=int, default=3)
+    rank_parser.add_argument("--limit", type=int, default=25)
+
     args = parser.parse_args()
     try:
         if args.command == "token":
             code = asyncio.run(_token_report(args.chain, args.token_address))
         elif args.command == "snapshot":
             code = asyncio.run(_save_snapshot(args.chain, args.token_address, args.db))
-        else:
+        elif args.command == "history":
             code = _show_history(args.chain, args.token_address, args.pair, args.db, args.limit)
+        else:
+            with SnapshotStore(args.db) as store:
+                snapshots = store.recent_snapshots()
+            result = rank_observed_pools(
+                snapshots, min_liquidity_usd=args.min_liquidity,
+                max_age_hours=args.max_age_hours,
+                min_observations=args.min_observations, limit=args.limit,
+            )
+            result["database"] = args.db
+            print(json.dumps(result, indent=2))
+            code = 0
     except (DexscreenerError, ValueError) as exc:
         print(f"viral-mint: {exc}", file=sys.stderr)
         code = 1
