@@ -17,3 +17,6 @@ build/
 data/*.sqlite
 data/*.sqlite3
 data/*.db
+
+exports/*.csv
+config/watchlist.json
