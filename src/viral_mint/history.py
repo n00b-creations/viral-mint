@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,12 +28,15 @@ class Snapshot:
     warnings: tuple[str, ...]
 
     @classmethod
-    def from_pair(cls, pair: MarketPair, observed_at: str | None = None) -> "Snapshot":
+    def from_pair(
+        cls, pair: MarketPair, observed_at: str | None = None,
+        token_address: str | None = None,
+    ) -> "Snapshot":
         score = score_pair(pair)
         return cls(
             observed_at=observed_at or datetime.now(timezone.utc).isoformat(),
             chain_id=pair.chain_id,
-            token_address=pair.base_token.address,
+            token_address=token_address or pair.base_token.address,
             pair_address=pair.pair_address,
             symbol=pair.base_token.symbol,
             price_usd=pair.price_usd,
@@ -139,11 +142,7 @@ def _change(previous: float | int | None, current: float | int | None) -> dict[s
 
 
 def analyze_trend(snapshots: list[Snapshot]) -> dict:
-    """Compare recent observations; acceleration is reported only with 3 samples.
-
-    Rates are per hour, derived from actual timestamp gaps. This is descriptive
-    telemetry, not a predictive signal; sparse or irregular samples are labeled.
-    """
+    """Compare recent observations; acceleration is reported only with 3 samples."""
     ordered = sorted(snapshots, key=lambda item: item.observed_at)
     if len(ordered) < 2:
         return {
@@ -161,11 +160,10 @@ def analyze_trend(snapshots: list[Snapshot]) -> dict:
         hours = (t1 - t0).total_seconds() / 3600
     except ValueError:
         hours = 0
+    rate_warning = None
     if hours <= 0:
         rate_warning = "Observation timestamps are not increasing; hourly rates unavailable."
         hours = 0
-    else:
-        rate_warning = None
 
     acceleration = {}
     if len(ordered) >= 3:
