@@ -47,28 +47,30 @@ class DexscreenerClient:
         for attempt in range(self.max_retries + 1):
             try:
                 response = await self._client.get(path)
+            except httpx.HTTPError as exc:
+                last_error = exc
+                if attempt == self.max_retries:
+                    raise DexscreenerError(f"Unable to retrieve token pairs after retries: {exc}") from exc
+                retry_after = None
+            else:
                 if response.status_code not in self.RETRYABLE_STATUS:
-                    response.raise_for_status()
+                    try:
+                        response.raise_for_status()
+                    except httpx.HTTPError as exc:
+                        raise DexscreenerError(f"Market API returned HTTP {response.status_code}: {exc}") from exc
                     return response
                 last_error = DexscreenerError(f"Transient HTTP status {response.status_code}")
                 if attempt == self.max_retries:
-                    response.raise_for_status()
+                    raise DexscreenerError(f"Market API still returned HTTP {response.status_code} after retries")
                 retry_after = response.headers.get("Retry-After")
-            except httpx.HTTPError as exc:
-                last_error = exc
-                retry_after = None
-                if attempt == self.max_retries:
-                    raise DexscreenerError(f"Unable to retrieve token pairs after retries: {exc}") from exc
-            if attempt < self.max_retries:
-                exponential = min(self.max_backoff_seconds, self.base_backoff_seconds * (2 ** attempt))
-                try:
-                    delay = float(retry_after) if retry_after is not None else exponential
-                except (ValueError, TypeError):
-                    delay = exponential
-                # Small jitter prevents synchronized clients; honor Retry-After without exceeding the cap.
-                delay = min(self.max_backoff_seconds, max(0.0, delay))
-                if delay:
-                    await asyncio.sleep(delay + random.uniform(0, min(0.1, delay * 0.1)))
+            exponential = min(self.max_backoff_seconds, self.base_backoff_seconds * (2 ** attempt))
+            try:
+                delay = float(retry_after) if retry_after is not None else exponential
+            except (ValueError, TypeError):
+                delay = exponential
+            delay = min(self.max_backoff_seconds, max(0.0, delay))
+            if delay:
+                await asyncio.sleep(delay + random.uniform(0, min(0.1, delay * 0.1)))
         raise DexscreenerError(f"Unable to retrieve token pairs: {last_error}")
 
     async def get_token_pairs(self, chain_id: str, token_address: str) -> list[MarketPair]:
